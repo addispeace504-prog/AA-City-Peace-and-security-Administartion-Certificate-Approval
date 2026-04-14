@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Certificate Verification</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #2c3e50, #3498db);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            margin: 0;
+        }
+        .container {
+            max-width: 500px;
+            width: 100%;
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .header {
+            background: linear-gradient(135deg, #2c3e50, #3498db);
+            padding: 25px;
+            text-align: center;
+            color: white;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 20px;
+        }
+        .header p {
+            margin: 5px 0 0;
+            font-size: 12px;
+            opacity: 0.9;
+        }
+        .content {
+            padding: 30px;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 6px 15px;
+            border-radius: 30px;
+            font-size: 13px;
+            font-weight: bold;
+        }
+        .status-approved { background: #d4edda; color: #155724; border-left: 4px solid #2ecc71; }
+        .status-pending { background: #fff3cd; color: #856404; border-left: 4px solid #f39c12; }
+        .status-rejected { background: #f8d7da; color: #721c24; border-left: 4px solid #e74c3c; }
+        .info-row {
+            display: flex;
+            padding: 10px 0;
+            border-bottom: 1px solid #ecf0f1;
+        }
+        .info-label {
+            width: 100px;
+            font-weight: bold;
+            color: #7f8c8d;
+            font-size: 13px;
+        }
+        .info-value {
+            flex: 1;
+            color: #2c3e50;
+            font-size: 14px;
+            word-break: break-word;
+        }
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .footer {
+            background: #f8f9fa;
+            padding: 12px;
+            text-align: center;
+            font-size: 11px;
+            color: #95a5a6;
+            border-top: 1px solid #e0e0e0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Certificate Verification</h1>
+            <p>Addis Ababa Peace & Security Bureau</p>
+        </div>
+        <div class="content" id="content">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Verifying certificate...</p>
+            </div>
+        </div>
+        <div class="footer">
+            <p>© 2024 Addis Ababa Peace & Security Bureau</p>
+        </div>
+    </div>
+
+    <script>
+        var urlParams = new URLSearchParams(window.location.search);
+        var certificateId = urlParams.get('id');
+        
+        if (!certificateId) {
+            document.getElementById('content').innerHTML = '<div class="error-message">No certificate ID provided</div>';
+        } else {
+            // Replace with your Google Apps Script Web App URL
+            var scriptUrl = 'https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec';
+            
+            var callbackName = 'jsonp_callback_' + Date.now();
+            window[callbackName] = function(response) {
+                delete window[callbackName];
+                document.body.removeChild(script);
+                displayResult(response);
+            };
+            
+            var script = document.createElement('script');
+            script.src = scriptUrl + '?action=getCertificateStatus&id=' + encodeURIComponent(certificateId) + '&callback=' + callbackName;
+            document.body.appendChild(script);
+            
+            setTimeout(function() {
+                if (window[callbackName]) {
+                    delete window[callbackName];
+                    document.getElementById('content').innerHTML = '<div class="error-message">Request timeout. Please try again.</div>';
+                }
+            }, 10000);
+        }
+        
+        function displayResult(response) {
+            var content = document.getElementById('content');
+            
+            if (!response.success) {
+                content.innerHTML = '<div class="error-message">' + (response.message || 'Certificate not found') + '</div>';
+                return;
+            }
+            
+            var cert = response.certificate;
+            var statusClass = '';
+            var statusText = '';
+            
+            if (cert.status === 'Approved') {
+                statusClass = 'status-approved';
+                statusText = '✓ APPROVED';
+            } else if (cert.status === 'Rejected') {
+                statusClass = 'status-rejected';
+                statusText = '✗ REJECTED';
+            } else {
+                statusClass = 'status-pending';
+                statusText = '⏳ PENDING APPROVAL';
+            }
+            
+            var html = '';
+            html += '<div class="status-badge ' + statusClass + '" style="display: block; text-align: center; margin-bottom: 20px;">' + statusText + '</div>';
+            html += '<div class="info-row"><div class="info-label">Certificate ID:</div><div class="info-value"><strong>' + escapeHtml(cert.certificateId) + '</strong></div></div>';
+            html += '<div class="info-row"><div class="info-label">Recipient:</div><div class="info-value">' + escapeHtml(cert.recipientName) + '</div></div>';
+            html += '<div class="info-row"><div class="info-label">Role:</div><div class="info-value">' + escapeHtml(cert.recipientRole) + '</div></div>';
+            html += '<div class="info-row"><div class="info-label">Event:</div><div class="info-value">' + escapeHtml(cert.eventName) + '</div></div>';
+            html += '<div class="info-row"><div class="info-label">Event Date:</div><div class="info-value">' + escapeHtml(cert.eventDate) + ' (' + escapeHtml(cert.eventYear) + ')</div></div>';
+            html += '<div class="info-row"><div class="info-label">Location:</div><div class="info-value">' + escapeHtml(cert.subCity) + ' / ' + escapeHtml(cert.district) + '</div></div>';
+            html += '<div class="info-row"><div class="info-label">Issued By:</div><div class="info-value">' + escapeHtml(cert.createdBy) + '</div></div>';
+            html += '<div class="info-row"><div class="info-label">Issue Date:</div><div class="info-value">' + escapeHtml(cert.date) + '</div></div>';
+            
+            if (cert.approvalDate) {
+                html += '<div class="info-row"><div class="info-label">Approval Date:</div><div class="info-value">' + escapeHtml(cert.approvalDate) + '</div></div>';
+            }
+            
+            content.innerHTML = html;
+        }
+        
+        function escapeHtml(text) {
+            if (!text) return '';
+            var div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
